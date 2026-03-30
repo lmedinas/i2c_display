@@ -7,7 +7,7 @@ You can optionally show the current time on line 4 in `HH:MM:SS` format.
 
 ## Files
 
-- `hello_i2c_display.py` prints `Hello World` on the first line.
+- `funny_i2c_display.py` prints `Hello World` on the first line.
 - It can also update the fourth line with the current time.
 
 ## Install (using Raspberry Pi OS)
@@ -27,37 +27,37 @@ On Raspberry Pi or similar Linux systems, also make sure I2C is enabled.
 ## Run
 
 ```bash
-python3 hello_i2c_display.py
+python3 funny_i2c_display.py
 ```
 
 You can also set the bus, address, or text explicitly:
 
 ```bash
-python3 hello_i2c_display.py --bus 1 --address 0x27 --text "Hello World"
+python3 funny_i2c_display.py --bus 1 --address 0x27 --text "Hello World"
 ```
 
 Show the time on the fourth line:
 
 ```bash
-python3 hello_i2c_display.py --text "Hello World" --show-time
+python3 funny_i2c_display.py --text "Hello World" --show-time
 ```
 
 Show a blinking heart on the second line:
 
 ```bash
-python3 hello_i2c_display.py --blink-heart --text "Hello World"
+python3 funny_i2c_display.py --blink-heart --text "Hello World"
 ```
 
 Blink the whole display on and off:
 
 ```bash
-python3 hello_i2c_display.py --blink-display --text "Hello World"
+python3 funny_i2c_display.py --blink-display --text "Hello World"
 ```
 
 Check help command for more information:
 
 ```bash
-python3 hello_i2c_display.py --help
+python3 funny_i2c_display.py --help
 ```
 
 ## Notes
