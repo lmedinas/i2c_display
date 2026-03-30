@@ -2,6 +2,7 @@
 """Show 'Hello World' on a common HD44780 I2C LCD."""
 
 import argparse
+from datetime import datetime
 from time import sleep
 
 try:
@@ -22,6 +23,8 @@ LCD_CMD = 0
 
 LCD_LINE_1 = 0x80
 LCD_LINE_2 = 0xC0
+LCD_LINE_3 = 0x94
+LCD_LINE_4 = 0xD4
 LCD_CGRAM = 0x40
 
 LCD_BACKLIGHT = 0x08
@@ -125,6 +128,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Blink the whole display on and off until interrupted",
     )
+    parser.add_argument(
+        "--show-time",
+        action="store_true",
+        help="Show the current time on the fourth line",
+    )
     return parser.parse_args()
 
 
@@ -154,6 +162,18 @@ def detect_address(bus_id: int) -> int:
     )
 
 
+def format_time() -> str:
+    now = datetime.now()
+    return now.strftime("%H:%M:%S")
+
+
+def update_time(lcd: I2cLcd, enabled: bool) -> None:
+    if enabled:
+        lcd.write_line(format_time(), LCD_LINE_4)
+    else:
+        lcd.write_line("", LCD_LINE_4)
+
+
 def scroll_frames(text: str) -> list[str]:
     if len(text) <= LCD_WIDTH:
         return [text]
@@ -162,19 +182,25 @@ def scroll_frames(text: str) -> list[str]:
     return [padded[index:index + LCD_WIDTH] for index in range(len(padded) - LCD_WIDTH + 1)]
 
 
-def scroll_text(lcd: I2cLcd, text: str, line: int, interval: float) -> None:
+def scroll_text(lcd: I2cLcd, text: str, line: int, interval: float, show_time: bool) -> None:
     frames = scroll_frames(text)
     if len(frames) == 1:
         lcd.write_line(text, line)
+        update_time(lcd, show_time)
+        if show_time:
+            while True:
+                update_time(lcd, True)
+                sleep(1)
         return
 
     while True:
         for frame in frames:
             lcd.write_line(frame, line)
+            update_time(lcd, show_time)
             sleep(interval)
 
 
-def blink_heart(lcd: I2cLcd, text: str, interval: float) -> None:
+def blink_heart(lcd: I2cLcd, text: str, interval: float, show_time: bool) -> None:
     heart_pattern = [
         0b00000,
         0b01010,
@@ -192,20 +218,26 @@ def blink_heart(lcd: I2cLcd, text: str, interval: float) -> None:
     while True:
         lcd.write_line(frames[frame_index], LCD_LINE_1)
         lcd.write_line(f"   {HEART_CHAR}   :)", LCD_LINE_2)
+        lcd.write_line("", LCD_LINE_3)
+        update_time(lcd, show_time)
         sleep(interval)
         lcd.write_line(frames[frame_index], LCD_LINE_1)
         lcd.write_line("        :)", LCD_LINE_2)
+        lcd.write_line("", LCD_LINE_3)
+        update_time(lcd, show_time)
         sleep(interval)
         frame_index = (frame_index + 1) % len(frames)
 
 
-def blink_display(lcd: I2cLcd, text: str, interval: float) -> None:
+def blink_display(lcd: I2cLcd, text: str, interval: float, show_time: bool) -> None:
     frames = scroll_frames(text)
 
     while True:
         for frame in frames:
             lcd.write_line(frame, LCD_LINE_1)
             lcd.write_line("", LCD_LINE_2)
+            lcd.write_line("", LCD_LINE_3)
+            update_time(lcd, show_time)
             lcd.display_on()
             sleep(interval)
             lcd.display_off()
@@ -218,12 +250,13 @@ def main() -> None:
     lcd = I2cLcd(bus_id=args.bus, address=address)
     try:
         if args.blink_heart:
-            blink_heart(lcd, args.text, args.interval)
+            blink_heart(lcd, args.text, args.interval, args.show_time)
         elif args.blink_display:
-            blink_display(lcd, args.text, args.interval)
+            blink_display(lcd, args.text, args.interval, args.show_time)
         else:
             lcd.write_line("", LCD_LINE_2)
-            scroll_text(lcd, args.text, LCD_LINE_1, args.interval)
+            lcd.write_line("", LCD_LINE_3)
+            scroll_text(lcd, args.text, LCD_LINE_1, args.interval, args.show_time)
     except KeyboardInterrupt:
         lcd.display_on()
         lcd.clear()
