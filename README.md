@@ -42,10 +42,22 @@ Show the time on the fourth line:
 python3 funny_i2c_display.py --text "Hello World" --show-time
 ```
 
+Show the remaining Codex weekly limit percentage on the third line:
+
+```bash
+python3 funny_i2c_display.py --text "Hello World" --show-tokens
+```
+
 Show a blinking heart on the second line:
 
 ```bash
 python3 funny_i2c_display.py --blink-heart --text "Hello World"
+```
+
+Show a countdown on the second line, updating every second:
+
+```bash
+python3 funny_i2c_display.py --text "Hello World" --countdown 01:12:30:00 --interval 1
 ```
 
 Blink the whole display on and off:
@@ -65,6 +77,8 @@ python3 funny_i2c_display.py --help
 - The script uses I2C bus `1` by default.
 - If no address is provided, it tries `0x27` and `0x3F`.
 - Long text scrolls across the first line automatically.
+- `--show-tokens` shows the remaining weekly Codex percentage on line 3, using local `~/.codex/sessions` data when available.
+- `--countdown` requires the `DD:HH:MM:SS` format and updates on line 2 at the configured `--interval`.
 - `--show-time` enables a live clock on the fourth line in `HH:MM:SS` format.
 - The fourth line uses 20x4-style LCD addressing.
 - If your display still does not respond, check the real address with `i2cdetect -y 1`.

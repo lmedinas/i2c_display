@@ -7,12 +7,12 @@ Cool ideas for the I2C display app.
 - [ ] Add support for Codex / Claude Code hooks to show coding start and stop status.
 - [ ] Display BTC, crypto, or stock prices.
 - [ ] Wire it to OpenClaw.
-- [ ] Countdown time for an event.
+- [X] Countdown time for an event.
 - [ ] Default options using a local file.
 
 ## More possibilities
 
-- [ ] Show CPU temperature, load, and memory usage.
+- [X] Show CPU temperature, load, and memory usage.
 - [ ] Display the current Git branch and latest commit hash.
 - [ ] Add Wi-Fi and network status.
 - [ ] Show calendar events or the next meeting.
