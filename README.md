@@ -66,6 +66,12 @@ Blink the whole display on and off:
 python3 funny_i2c_display.py --blink-display --text "Hello World"
 ```
 
+Launch the program as a background daemon:
+
+```bash
+python3 funny_i2c_display.py --daemon --text "Hello World" --show-time
+```
+
 Check help command for more information:
 
 ```bash
@@ -80,5 +86,6 @@ python3 funny_i2c_display.py --help
 - `--show-tokens` shows the remaining weekly Codex percentage on line 3, using local `~/.codex/sessions` data when available.
 - `--countdown` requires the `DD:HH:MM:SS` format and updates on line 2 at the configured `--interval`.
 - `--show-time` enables a live clock on the fourth line in `HH:MM:SS` format.
+- `--daemon` detaches the process from the current terminal and keeps it running in the background.
 - The fourth line uses 20x4-style LCD addressing.
 - If your display still does not respond, check the real address with `i2cdetect -y 1`.

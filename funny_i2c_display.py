@@ -1,7 +1,9 @@
 import argparse
 import json
+import os
 import re
 import subprocess
+import sys
 from datetime import datetime
 from pathlib import Path
 import time
@@ -101,6 +103,11 @@ class I2cLcd:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--daemon",
+        action="store_true",
+        help="Detach from the terminal and keep the display process running in the background",
+    )
     parser.add_argument("--bus", type=int, default=1, help="I2C bus number, default: 1")
     parser.add_argument(
         "--address",
@@ -252,8 +259,72 @@ def get_system_resources() -> str:
         return "CPU: Err RAM: Err"
 
 
+def _iter_session_files() -> list[Path]:
+    sessions_root = Path.home() / ".codex" / "sessions"
+    if not sessions_root.exists():
+        return []
+    return sorted(
+        (path for path in sessions_root.rglob("*.jsonl") if path.is_file()),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+
+
+def load_token_cache(token_cache: dict) -> None:
+    if time.time() - token_cache["last_update"] < 30:
+        return
+
+    token_cache["last_update"] = time.time()
+    token_cache["value"] = "Weekly: N/A"
+
+    for session_file in _iter_session_files():
+        try:
+            with session_file.open("r", encoding="utf-8") as handle:
+                for line in reversed(handle.readlines()):
+                    if not line.strip():
+                        continue
+                    payload = json.loads(line)
+                    if payload.get("type") != "event_msg":
+                        continue
+                    event_payload = payload.get("payload", {})
+                    if event_payload.get("type") != "token_count":
+                        continue
+                    secondary = event_payload.get("rate_limits", {}).get("secondary")
+                    if not secondary:
+                        continue
+                    used_percent = secondary.get("used_percent")
+                    if used_percent is None:
+                        continue
+                    remaining_percent = max(0, min(100, round(100 - float(used_percent))))
+                    token_cache["value"] = f"Weekly Tokens: {remaining_percent}%"
+                    return
+        except (OSError, ValueError, json.JSONDecodeError):
+            continue
+
+
 def get_token_text(token_cache: dict) -> str:
+    load_token_cache(token_cache)
     return token_cache.get("value", "")
+
+
+def get_scrolling_frame(text: str, scroll_cache: dict, interval: float) -> str:
+    if scroll_cache.get("scroll_value") != text:
+        scroll_cache["scroll_value"] = text
+        scroll_cache["frames"] = scroll_frames(text)
+        scroll_cache["frame_index"] = 0
+        scroll_cache["last_frame_at"] = monotonic()
+
+    frames = scroll_cache.get("frames", [""])
+    if len(frames) == 1:
+        return frames[0]
+
+    now = monotonic()
+    last_frame_at = scroll_cache.get("last_frame_at", 0.0)
+    if now - last_frame_at >= interval:
+        scroll_cache["frame_index"] = (scroll_cache["frame_index"] + 1) % len(frames)
+        scroll_cache["last_frame_at"] = now
+
+    return frames[scroll_cache["frame_index"]]
 
 
 def update_status_lines(
@@ -272,7 +343,7 @@ def update_status_lines(
     if show_resources:
         line_3 = get_system_resources()
     elif show_tokens:
-        line_3 = get_token_text(token_cache)
+        line_3 = get_scrolling_frame(get_token_text(token_cache), token_cache, interval)
 
     if uptime_enabled:
         line_4 = get_system_uptime()
@@ -408,14 +479,52 @@ def blink_display(lcd: I2cLcd, text: str, interval: float, show_time: bool,
             sleep(interval)
 
 
+def daemonize() -> None:
+    if os.name != "posix":
+        raise SystemExit("Daemon mode is only supported on POSIX systems.")
+
+    try:
+        pid = os.fork()
+        if pid > 0:
+            print(f"Daemon started with PID {pid}")
+            raise SystemExit(0)
+    except OSError as exc:
+        raise SystemExit(f"Unable to start daemon: first fork failed ({exc})") from exc
+
+    os.setsid()
+    os.umask(0)
+
+    try:
+        pid = os.fork()
+        if pid > 0:
+            raise SystemExit(0)
+    except OSError as exc:
+        raise SystemExit(f"Unable to start daemon: second fork failed ({exc})") from exc
+
+    sys.stdout.flush()
+    sys.stderr.flush()
+
+    with open(os.devnull, "r", encoding="utf-8") as read_null, open(
+        os.devnull, "a", encoding="utf-8"
+    ) as write_null:
+        os.dup2(read_null.fileno(), sys.stdin.fileno())
+        os.dup2(write_null.fileno(), sys.stdout.fileno())
+        os.dup2(write_null.fileno(), sys.stderr.fileno())
+
+
 def main() -> None:
     args = parse_args()
+
+    if args.daemon:
+        daemonize()
+
     address = args.address if args.address is not None else detect_address(args.bus)
     lcd = I2cLcd(bus_id=args.bus, address=address)
     
     token_cache = {
         'last_update': 0,
         'value': "",
+        'scroll_value': "",
         'frames': [""],
         'frame_index': 0,
         'last_frame_at': 0.0,
